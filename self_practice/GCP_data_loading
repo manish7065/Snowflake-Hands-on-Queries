@@ -1,0 +1,57 @@
+-- GCP storage integration creation
+CREATE STORAGE INTEGRATION gcp_integration 
+TYPE = EXTERNAL_STAGE
+STORAGE_PROVIDER = GCS
+ENABLED = TRUE
+STORAGE_ALLOWED_LOCATIONS = ('gcs://maimage97-gcp-bucket/snowflake_practice_data/LN/MNCR_DOCS/tdd');
+
+show storage integrations;
+
+DESC STORAGE INTEGRATION gcp_integration;
+
+-- granting the access roles
+create role gcp_role;
+grant create stage on schema trial.mncr to role gcp_role;
+grant usage on integration gcp_integration to role gcp_role;
+
+USE ROLE gcp_role;
+USE ROLE orgadmin;
+USE ROLE accountadmin;
+
+
+show roles;
+
+USE DATABASE TRIAL;
+
+-- create file format for file maimage97-gcp-bucket/snowflake_practice_data/LN/MNCR_DOCS/tdd/docs_1001000002.csv
+
+CREATE file format docs_1001000002_ff 
+TYPE = CSV
+RECORD_DELIMITER = '\n'
+SKIP_HEADER = 0
+ERROR_ON_COLUMN_COUNT_MISMATCH = FALSE
+TRIM_SPACE = TRUE;
+
+CREATE TABLE docs_1001000002_TBL(
+docs varchar
+);
+
+copy into docs_1001000002_TBL
+from @docs_1001000002_STG
+FILE_FORMAT = (FORMAT_NAME = 'docs_1001000002_ff')
+ON_ERROR = 'CONTINUE';
+
+CREATE STAGE docs_1001000002_STG;
+list @docs_1001000002_STG;
+
+create stage gcp_stage
+url = 'gcs://maimage97-gcp-bucket/snowflake_practice_data/LN/MNCR_DOCS/tdd/'
+storage_integration = gcp_integration;
+
+copy into docs_1001000002_tbl from @gcp_stage
+file_format = (format_name = docs_1001000002_ff);
+
+list @gcp_stage;
+
+
+-- copying all data into a table 

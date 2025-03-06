@@ -1,0 +1,21 @@
+-- data loading snowflake queries
+
+COPY INTO "CUSTOMER_DB"."CUSTOMER_SCHEMA"."CUSTOMER2"
+FROM (
+    SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
+    FROM '@"CUSTOMER_DB"."CUSTOMER_SCHEMA"."__snowflake_temp_import_files__"'
+)
+FILES = ('2025-02-21T16:20:17.385Z/customer2.csv')
+FILE_FORMAT = (
+    TYPE=CSV,
+    SKIP_HEADER=1,
+    FIELD_DELIMITER=',',
+    TRIM_SPACE=TRUE,
+    FIELD_OPTIONALLY_ENCLOSED_BY='"',
+    REPLACE_INVALID_CHARACTERS=TRUE,
+    DATE_FORMAT=AUTO,
+    TIME_FORMAT=AUTO,
+    TIMESTAMP_FORMAT='YYYY-MM-DD HH24:MI:SS'
+)
+ON_ERROR=CONTINUE;
+-- For more details, see: https://docs.snowflake.com/en/sql-reference/sql/copy-into-table

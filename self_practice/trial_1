@@ -1,0 +1,186 @@
+select * from snowflake_sample_data.tpch_sf1.customer;
+
+create schema mncr;
+
+
+CREATE OR REPLACE STAGE my_mncr_stage1;
+
+list @my_mncr_stage1;
+
+snowsql -q "PUT file://path/to/your_file.csv @admin_stage;"
+snowsql -q "PUT file:///media/manu/sec_storage/LN/data/tdd/docsmetadata_1001000003.csv @TRIAL.MNCR.MY_MNCR_STAGE1"
+
+
+
+CREATE OR REPLACE TABLE trial.mncr.document_tbl
+(
+    RCI NUMBER(10,0),
+    DOC VARIANT,
+    LNI VARCHAR(100),
+    VERSION NUMBER(4,0),
+    FLAG_DELETED BOOLEAN,
+    FILE_NAME VARCHAR(500),
+    LNI_NAME VARCHAR(500)
+);
+
+LIST @trial.MNCR.MY_MNCR_STAGE1;
+
+COPY INTO TRIAL.MNCR.DOCUMENT_TBL
+FROM @trial.MNCR.MY_MNCR_STAGE1;
+
+
+-- trying to create a row table to deal with || and dual line data
+
+CREATE OR REPLACE TABLE raw_document_tbl (
+    raw_line VARCHAR
+);
+
+-- Load the raw file from the stage into this table
+COPY INTO raw_document_tbl
+FROM @trial.MNCR.MY_MNCR_STAGE1/;
+FILE_FORMAT = (FORMAT_NAME = 'csv')
+ON_ERROR = 'CONTINUE';
+
+
+CREATE OR REPLACE FILE FORMAT csv_with_custom_delimiter
+TYPE = 'CSV'
+FIELD_DELIMITER = '||'
+RECORD_DELIMITER = '\n'
+SKIP_HEADER = 0
+ERROR_ON_COLUMN_COUNT_MISMATCH = FALSE
+TRIM_SPACE = TRUE;
+
+COPY INTO raw_document_tbl
+FROM @trial.MNCR.MY_MNCR_STAGE1/
+FILE_FORMAT = (FORMAT_NAME = 'csv_with_custom_delimiter')
+ON_ERROR = 'CONTINUE';
+
+
+-- 2nd trial to del with removel of <?xml version="1.0" encoding="UTF-8"?> part in odd rows
+CREATE OR REPLACE FILE FORMAT csv_with_custom_delimiter2
+TYPE = 'CSV'
+-- FIELD_DELIMITER = '\n'
+RECORD_DELIMITER = '\n'
+SKIP_HEADER = 0
+ERROR_ON_COLUMN_COUNT_MISMATCH = FALSE
+TRIM_SPACE = TRUE;
+
+CREATE OR REPLACE TABLE raw_document_tbl2 (
+    raw_line VARCHAR
+);
+
+COPY INTO raw_document_tbl2
+FROM @trial.MNCR.MY_MNCR_STAGE1/
+FILE_FORMAT = (FORMAT_NAME = 'csv_with_custom_delimiter2')
+ON_ERROR = 'CONTINUE';
+
+
+select* from raw_document_tbl2;
+
+CREATE OR REPLACE TABLE processed_document_tbl AS
+SELECT
+    SPLIT_PART(combined_lines, '||', 1)::NUMBER(10,0) AS RCI,
+    SPLIT_PART(combined_lines, '||', 2)::VARIANT AS DOC,
+    SPLIT_PART(combined_lines, '||', 3)::VARCHAR(1) AS LNI,
+    SPLIT_PART(combined_lines, '||', 4)::NUMBER(4,0) AS VERSION,
+    SPLIT_PART(combined_lines, '||', 5)::BOOLEAN AS FLAG_DELETED,
+    SPLIT_PART(combined_lines, '||', 6)::VARCHAR(500) AS FILE_NAME,
+    SPLIT_PART(combined_lines, '||', 7)::VARCHAR(500) AS LNI_NAME
+FROM (
+    SELECT 
+        LAG(raw_line) OVER (ORDER BY seq_num) || raw_line AS combined_lines,
+        ROW_NUMBER() OVER (ORDER BY seq_num) AS rn
+    FROM (
+        SELECT 
+            raw_line, 
+            ROW_NUMBER() OVER (ORDER BY NULL) AS seq_num
+        FROM raw_document_tbl2
+    )
+)
+WHERE rn % 2 = 0;
+
+select * from processed_document_tbl;
+
+DELETE FROM raw_document_tbl2
+WHERE ROW_NUMBER() OVER (ORDER BY raw_line) = 1;
+
+--------------------------------
+
+WITH numbered_rows AS (
+    SELECT
+        raw_line,
+        ROW_NUMBER() OVER (ORDER BY some_column) AS row_num
+    FROM table_name
+),
+paired_rows AS (
+    SELECT
+        raw_line,
+        row_num,
+        CEIL(row_num / 2) AS pair_group
+    FROM numbered_rows
+)
+SELECT
+    LISTAGG(column_name, ', ') WITHIN GROUP (ORDER BY row_num) AS combined_data
+FROM paired_rows
+GROUP BY pair_group
+ORDER BY pair_group;
+
+-- <creating new warehouse
+create warehouse my_warehouse1;
+
+SELECT CURRENT_ORGANIZATION_NAME() || '-' || CURRENT_ACCOUNT_NAME();
+
+SELECT CURRENT_ACCOUNT_NAME();
+
+SELECT CURRENT_ROLE();
+
+use my_warehouse();
+
+USE WAREHOUSE COMPUTE_WH;
+
+
+SHOW DATABASES;
+
+SELECT COMPUTE_WH;
+
+-------------------------------------------------------Role creation
+
+
+SHOW ROLES;
+USE ROLE SYSADMIN;
+USE ROLE USER_ROLE;
+
+CREATE ROLE USER_ROLE
+COMMENT = 'User with select previliges';
+
+GRANT SELECT ON TABLE TRIAL.MNCR.RAW_DOCUMENT_TBL2 TO ROLE USER_ROLE;
+
+GRANT SELECT ON SCHEMA TRIAL.MNCR TO ROLE USER_ROLE;
+
+USE ROLE ACCOUNTADMIN;
+
+
+GRANT USAGE ON WAREHOUSE MY_WAREHOUSE1 TO ROLE USER_ROLE;
+GRANT USAGE ON DATABASE TRIAL TO ROLE USER_ROLE;
+GRANT USAGE ON SCHEMA TRIAL.MNCR TO ROLE USER_ROLE;
+
+
+CREATE USER trial_user
+PASSWORD = 'Trial@123'
+DEFAULT_ROLE = USER_ROLE
+MUST_CHANGE_PASSWORD = FALSE;
+
+
+GRANT ROLE USER_ROLE TO USER trial_user;
+
+show grants to user trial_user;
+
+use trial_user;
+
+SELECT * FROM TRIAL.MNCR.RAW_DOCUMENT_TBL2;
+
+
+
+
+
+
