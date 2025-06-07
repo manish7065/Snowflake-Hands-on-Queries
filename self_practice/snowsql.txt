@@ -1,0 +1,8 @@
+trials:
+
+# Any case(small/capital) will work if the full address of the snowflake is given
+# tested on mac and ubuntu
+
+snowsql -a QNRKJ-EV59963 -u maimage95
+snowsql -a qnrkj-ev59963 -u maimage95
+
