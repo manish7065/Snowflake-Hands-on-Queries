@@ -82,3 +82,18 @@ $1:"store_id"::VARCHAR(50) as Store_ID,
 $1:"value"::int as value
 FROM @MANAGE_DB.EXTERNAL_STAGES.PARQUETSTAGE;
 
+
+
+-- data sample 
+{
+  "__index_level_0__": 7,
+  "cat_id": "HOBBIES",
+  "d": 489,
+  "date": 1338422400000000,
+  "dept_id": "HOBBIES_1",
+  "id": "HOBBIES_1_008_CA_1_evaluation",
+  "item_id": "HOBBIES_1_008",
+  "state_id": "CA",
+  "store_id": "CA_1",
+  "value": 12
+}
