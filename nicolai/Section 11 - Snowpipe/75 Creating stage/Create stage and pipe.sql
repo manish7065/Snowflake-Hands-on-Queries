@@ -17,6 +17,7 @@ CREATE OR REPLACE file format MANAGE_DB.file_formats.csv_fileformat
     null_if = ('NULL','null')
     empty_field_as_null = TRUE;
     
+https://snowflakes3bucket123.s5.us-east-1
     
  // Create stage object with integration object & file format object
 CREATE OR REPLACE stage MANAGE_DB.external_stages.csv_folder
@@ -43,3 +44,5 @@ FROM @MANAGE_DB.external_stages.csv_folder
 DESC pipe employee_pipe
     
 SELECT * FROM OUR_FIRST_DB.PUBLIC.employees    
+
+-- https://snowflakes3bucket123.s3.amazonaws.com/csv/snowpipe
